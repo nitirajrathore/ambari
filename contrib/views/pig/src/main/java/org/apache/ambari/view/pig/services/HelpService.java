@@ -26,6 +26,8 @@ import org.apache.ambari.view.pig.resources.jobs.JobResourceManager;
 import org.apache.ambari.view.pig.utils.ServiceCheck;
 import org.apache.ambari.view.pig.utils.ServiceFormattedException;
 import org.apache.ambari.view.utils.hdfs.HdfsApiException;
+import org.apache.pig.data.Tuple;
+import org.apache.pig.impl.plan.OperatorPlan;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +37,9 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.*;
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 
 import org.apache.pig.tools.pigstats.InputStats;
 import org.apache.pig.tools.pigstats.JobStats;
@@ -147,20 +151,87 @@ public class HelpService extends BaseService {
     return getOKResponse();
   }
 
+  public static class MyPigProgressNotificationListener implements PigProgressNotificationListener {
+    @Override
+    public void initialPlanNotification(String s, OperatorPlan<?> operatorPlan) {
+      LOG.info("nitiraj initialPlanNotification : s={}, operatorPlan={}", s, operatorPlan);
+    }
+
+    @Override
+    public void launchStartedNotification(String s, int i) {
+      LOG.info("nitiraj launchStartedNotification : s={}, i={}", s, i);
+    }
+
+    @Override
+    public void jobsSubmittedNotification(String s, int i) {
+      LOG.info("nitiraj jobsSubmittedNotification : s={}, i={}", s, i);
+    }
+
+    @Override
+    public void jobStartedNotification(String s, String s1) {
+      LOG.info("nitiraj jobStartedNotification : s={}, s1={}", s, s1);
+    }
+
+    @Override
+    public void jobFinishedNotification(String s, JobStats jobStats) {
+      LOG.info("nitiraj jobFinishedNotification : s={}, jobStats={}", s, jobStats);
+    }
+
+    @Override
+    public void jobFailedNotification(String s, JobStats jobStats) {
+      LOG.info("nitiraj jobFailedNotification : s={}, jobStats={}", s, jobStats);
+    }
+
+    @Override
+    public void outputCompletedNotification(String s, OutputStats outputStats) {
+      LOG.info("nitiraj outputCompletedNotification : s={}, outputStats={}", s, outputStats);
+      try {
+        Iterator<Tuple> iterator = outputStats.iterator();
+        int i= 0 ;
+        while(iterator.hasNext()){
+          LOG.info( "nitiraj : result : {} : {}",i, iterator.next());
+        }
+      } catch (IOException e) {
+        LOG.error("error occurred while iterating results : ", e);
+      }
+    }
+
+    @Override
+    public void progressUpdatedNotification(String s, int i) {
+      LOG.info("nitiraj progressUpdatedNotification : s={}, i={}", s, i);
+    }
+
+    @Override
+    public void launchCompletedNotification(String s, int i) {
+      LOG.info("nitiraj launchCompletedNotification : s={}, i={}", s, i);
+    }
+  }
   /**
    * Get single item
    */
   @GET
   @Path("/exec")
   @Produces(MediaType.APPLICATION_JSON)
-  public Response getUDF() {
+  public Response executePigQuery() {
     try {
+      String query ="truck_events = LOAD '/tmp/truck_event_text_partition.csv' USING PigStorage(',')" +
+          "AS (driverId:int, truckId:int, eventTime:chararray," +
+          "eventType:chararray, longitude:double, latitude:double," +
+          "eventKey:chararray, correlationId:long, driverName:chararray," +
+          "routeId:long,routeName:chararray,eventDate:chararray);" +
+          "DESCRIBE truck_events;" +
+          "truck_events_subset = LIMIT truck_events 100;" +
+          "DESCRIBE truck_events_subset;" +
+          "DUMP truck_events_subset;";
       String[] args = new String[]{
-          "-x", "local",
-          "-e", "explain -script Temp1/TPC_test.pig -out explain-out9.txt"
+          "-x", "tez",
+          "-e", query
       };
 
-      PigStats stats = PigRunner.run(args, null);
+      LOG.info("executing with query = {}", query);
+
+      PigStats stats = PigRunner.run(args, new MyPigProgressNotificationListener());
+      LOG.info("PigStats : {}", stats);
       return Response.ok().build();
     } catch (WebApplicationException ex) {
       throw ex;
