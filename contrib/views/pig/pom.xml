@@ -29,6 +29,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.apache.pig</groupId>
+      <artifactId>pig</artifactId>
+      <version>${pig.version}</version>
+    </dependency>
+    <dependency>
       <groupId>com.google.inject</groupId>
       <artifactId>guice</artifactId>
     </dependency>
@@ -155,6 +160,7 @@
     <ambari.dir>${project.parent.parent.parent.basedir}</ambari.dir>
     <ambari.version>2.7.1.0.0</ambari.version>
     <ui.directory>${basedir}/src/main/resources/ui/pig-web</ui.directory>
+    <pig.version>0.16.0</pig.version>
   </properties>
   <build>
     <plugins>

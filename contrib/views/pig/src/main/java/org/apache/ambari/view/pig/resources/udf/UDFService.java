@@ -31,6 +31,16 @@ import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.pig.tools.pigstats.InputStats;
+import org.apache.pig.tools.pigstats.JobStats;
+import org.apache.pig.tools.pigstats.OutputStats;
+import org.apache.pig.tools.pigstats.PigProgressNotificationListener;
+import org.apache.pig.tools.pigstats.PigStats;
+import org.apache.pig.tools.pigstats.PigStatsUtil;
+import org.apache.pig.PigRunner;
+import org.apache.pig.PigRunner.ReturnCode;
+
+
 import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
@@ -80,6 +90,28 @@ public class UDFService extends BaseService {
       throw ex;
     } catch (ItemNotFound itemNotFound) {
       throw new NotFoundFormattedException(itemNotFound.getMessage(), itemNotFound);
+    } catch (Exception ex) {
+      throw new ServiceFormattedException(ex.getMessage(), ex);
+    }
+  }
+
+  /**
+   * Get single item
+   */
+  @GET
+  @Path("{exec}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response getUDF() {
+    try {
+      String[] args = new String[]{
+          "-x", "local",
+          "-e", "explain -script Temp1/TPC_test.pig -out explain-out9.txt"
+      };
+
+      PigStats stats = PigRunner.run(args, null);
+      return Response.ok().build();
+    } catch (WebApplicationException ex) {
+      throw ex;
     } catch (Exception ex) {
       throw new ServiceFormattedException(ex.getMessage(), ex);
     }
