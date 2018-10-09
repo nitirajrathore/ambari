@@ -33,8 +33,19 @@ import org.slf4j.LoggerFactory;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.*;
 import java.util.HashMap;
+
+import org.apache.pig.tools.pigstats.InputStats;
+import org.apache.pig.tools.pigstats.JobStats;
+import org.apache.pig.tools.pigstats.OutputStats;
+import org.apache.pig.tools.pigstats.PigProgressNotificationListener;
+import org.apache.pig.tools.pigstats.PigStats;
+import org.apache.pig.tools.pigstats.PigStatsUtil;
+import org.apache.pig.PigRunner;
+import org.apache.pig.PigRunner.ReturnCode;
+
 
 /**
  * Help service
@@ -134,6 +145,28 @@ public class HelpService extends BaseService {
   public Response storageStatus(){
     DataStoreStorage.storageSmokeTest(context);
     return getOKResponse();
+  }
+
+  /**
+   * Get single item
+   */
+  @GET
+  @Path("/exec")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Response getUDF() {
+    try {
+      String[] args = new String[]{
+          "-x", "local",
+          "-e", "explain -script Temp1/TPC_test.pig -out explain-out9.txt"
+      };
+
+      PigStats stats = PigRunner.run(args, null);
+      return Response.ok().build();
+    } catch (WebApplicationException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      throw new ServiceFormattedException(ex.getMessage(), ex);
+    }
   }
 
   @GET

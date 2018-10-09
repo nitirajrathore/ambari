@@ -96,28 +96,6 @@ public class UDFService extends BaseService {
   }
 
   /**
-   * Get single item
-   */
-  @GET
-  @Path("{exec}")
-  @Produces(MediaType.APPLICATION_JSON)
-  public Response getUDF() {
-    try {
-      String[] args = new String[]{
-          "-x", "local",
-          "-e", "explain -script Temp1/TPC_test.pig -out explain-out9.txt"
-      };
-
-      PigStats stats = PigRunner.run(args, null);
-      return Response.ok().build();
-    } catch (WebApplicationException ex) {
-      throw ex;
-    } catch (Exception ex) {
-      throw new ServiceFormattedException(ex.getMessage(), ex);
-    }
-  }
-
-  /**
    * Delete single item
    */
   @DELETE
