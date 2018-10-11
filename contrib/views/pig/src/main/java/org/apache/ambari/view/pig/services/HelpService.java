@@ -222,7 +222,8 @@ public class HelpService extends BaseService {
           "DESCRIBE truck_events;" +
           "truck_events_subset = LIMIT truck_events 100;" +
           "DESCRIBE truck_events_subset;" +
-          "DUMP truck_events_subset;";
+          "DUMP truck_events_subset;" +
+          "STORE truck_events_subset INTO '/tmp/truck_events_subset.csv' USING PigStorage (',');\n";
       String[] args = new String[]{
           "-x", "tez",
           "-e", query

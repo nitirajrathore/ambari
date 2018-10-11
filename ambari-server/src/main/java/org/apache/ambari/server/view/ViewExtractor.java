@@ -205,12 +205,12 @@ public class ViewExtractor {
 
         // include libs in additional classpath
     for (File file : viewsAdditionalClasspath) {
-      if (file.isDirectory()) {
-        // add all files inside this dir.
-        addDirToClasspath(urlList, file);
-      } else if (file.isFile()) {
+//      if (file.isDirectory()) {
+//        // add all files inside this dir.
+//        addDirToClasspath(urlList, file);
+//      } else if (file.isFile()) {
         urlList.add(file.toURI().toURL());
-      }
+//      }
     }
 
     // include any libraries in the lib directory
