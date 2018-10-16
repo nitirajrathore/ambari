@@ -25,30 +25,34 @@ import org.apache.ambari.view.pig.resources.files.FileService;
 import org.apache.ambari.view.pig.resources.jobs.JobResourceManager;
 import org.apache.ambari.view.pig.utils.ServiceCheck;
 import org.apache.ambari.view.pig.utils.ServiceFormattedException;
+import org.apache.ambari.view.utils.hdfs.ConfigurationBuilder;
 import org.apache.ambari.view.utils.hdfs.HdfsApiException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.pig.ExecType;
+import org.apache.pig.PigServer;
+import org.apache.pig.backend.executionengine.ExecJob;
+import org.apache.pig.backend.hadoop.datastorage.ConfigurationUtil;
 import org.apache.pig.data.Tuple;
 import org.apache.pig.impl.plan.OperatorPlan;
+import org.apache.pig.impl.util.PropertiesUtil;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.*;
 import javax.ws.rs.core.*;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Properties;
+import java.util.stream.Collectors;
 
-import org.apache.pig.tools.pigstats.InputStats;
 import org.apache.pig.tools.pigstats.JobStats;
 import org.apache.pig.tools.pigstats.OutputStats;
 import org.apache.pig.tools.pigstats.PigProgressNotificationListener;
 import org.apache.pig.tools.pigstats.PigStats;
-import org.apache.pig.tools.pigstats.PigStatsUtil;
 import org.apache.pig.PigRunner;
-import org.apache.pig.PigRunner.ReturnCode;
 
 
 /**
@@ -198,32 +202,87 @@ public class HelpService extends BaseService {
 
     @Override
     public void progressUpdatedNotification(String s, int i) {
-      LOG.info("nitiraj progressUpdatedNotification : s={}, i={}", s, i);
+     LOG.info("nitiraj progressUpdatedNotification : s={}, i={}", s, i);
     }
 
     @Override
     public void launchCompletedNotification(String s, int i) {
-      LOG.info("nitiraj launchCompletedNotification : s={}, i={}", s, i);
+      LOG.info("nitiraj launchCompletedNotificcation : s={}, i={}", s, i);
     }
   }
   /**
    * Get single item
    */
   @GET
-  @Path("/exec")
-  @Produces(MediaType.APPLICATION_JSON)
-  public Response executePigQuery() {
+  @Path("/execOnRunner")
+  @Produces(MediaType.APPLICATION_JSON) public Response executePigQueryOnRunner(@QueryParam("pigQuery") String pigQuery){
+    return executePigQueryWithPigRunner(pigQuery);
+  }
+
+  /**
+   * Get single item
+   */
+  @GET
+  @Path("/execOnServer")
+  @Produces(MediaType.APPLICATION_JSON) public Response executePigQueryOnServer(@QueryParam("pigQuery")String pigQuery){
+    return executePigQueryWithPigServer(pigQuery);
+  }
+
+//  private Response executePigQueryWithPigServer() {
+//    PigServer pigServer = new PigServer();
+//
+//    return null;
+//  }
+
+  public Response executePigQueryWithPigServer(String query) {
     try {
-      String query ="truck_events = LOAD '/tmp/truck_event_text_partition.csv' USING PigStorage(',')" +
-          "AS (driverId:int, truckId:int, eventTime:chararray," +
-          "eventType:chararray, longitude:double, latitude:double," +
-          "eventKey:chararray, correlationId:long, driverName:chararray," +
-          "routeId:long,routeName:chararray,eventDate:chararray);" +
-          "DESCRIBE truck_events;" +
-          "truck_events_subset = LIMIT truck_events 100;" +
-          "DESCRIBE truck_events_subset;" +
-          "DUMP truck_events_subset;" +
-          "STORE truck_events_subset INTO '/tmp/truck_events_subset.csv' USING PigStorage (',');\n";
+//      String[] args = new String[]{
+//          "-x", "tez",
+//          "-e", query
+//      };
+//truck_events = LOAD '/tmp/truck_event_text_partition.csv' USING PigStorage(',')AS (driverId:int, truckId:int, eventTime:chararray,eventType:chararray, longitude:double, latitude:double,eventKey:chararray, correlationId:long, driverName:chararray,routeId:long,routeName:chararray,eventDate:chararray);DESCRIBE truck_events;truck_events_subset = LIMIT truck_events 100;DESCRIBE truck_events_subset;DUMP truck_events_subset;STORE truck_events_subset INTO '/tmp/truck_events_subset.csv' USING PigStorage (',');
+
+      query = "truck_events = LOAD '/tmp/truck_event_text_partition.csv' USING PigStorage(',')AS (driverId:int, truckId:int, eventTime:chararray,eventType:chararray, longitude:double, latitude:double,eventKey:chararray, correlationId:long, driverName:chararray,routeId:long,routeName:chararray,eventDate:chararray);DESCRIBE truck_events;truck_events_subset = LIMIT truck_events 100;DESCRIBE truck_events_subset;DUMP truck_events_subset;STORE truck_events_subset INTO '/tmp/truck_events_subset.csv' USING PigStorage (',');";
+      LOG.info("executing with query with pigServer = {}", query);
+      ConfigurationBuilder configurationBuilder = new ConfigurationBuilder(context);
+      Configuration conf = configurationBuilder.buildConfig();
+
+      Properties properties = new Properties();
+      PropertiesUtil.loadDefaultProperties(properties);
+      properties.putAll(ConfigurationUtil.toProperties(conf));
+
+      ExecType execType = ExecType.MAPREDUCE;
+      PigServer pigServer = new PigServer(execType, properties);
+      pigServer.registerQuery(query);
+      pigServer.setBatchOn();
+      List<ExecJob> execJobs = pigServer.executeBatch();
+      List<PigStats> pigStats = new ArrayList<PigStats>(execJobs.size());
+      for(ExecJob execJob : execJobs){
+        pigStats.add(execJob.getStatistics());
+      }
+      LOG.info("All PigStats : {}", pigStats);
+      return Response.ok(pigStats).build();
+    } catch (WebApplicationException ex) {
+      LOG.error("webapp error occurred while executing pig query on server : ", ex);
+      throw ex;
+    } catch (Exception ex) {
+      LOG.error("error occurred while executing pig query on server : ", ex);
+      throw new ServiceFormattedException(ex.getMessage(), ex);
+    }
+  }
+
+  public Response executePigQueryWithPigRunner(String query) {
+    try {
+//      String query = "truck_events = LOAD '/tmp/truck_event_text_partition.csv' USING PigStorage(',')" +
+//          "AS (driverId:int, truckId:int, eventTime:chararray," +
+//          "eventType:chararray, longitude:double, latitude:double," +
+//          "eventKey:chararray, correlationId:long, driverName:chararray," +
+//          "routeId:long,routeName:chararray,eventDate:chararray);" +
+//          "DESCRIBE truck_events;" +
+//          "truck_events_subset = LIMIT truck_events 100;" +
+//          "DESCRIBE truck_events_subset;" +
+//          "DUMP truck_events_subset;" +
+//          "STORE truck_events_subset INTO '/tmp/truck_events_subset.csv' USING PigStorage (',');\n";
       String[] args = new String[]{
           "-x", "tez",
           "-e", query
@@ -233,7 +292,7 @@ public class HelpService extends BaseService {
 
       PigStats stats = PigRunner.run(args, new MyPigProgressNotificationListener());
       LOG.info("PigStats : {}", stats);
-      return Response.ok().build();
+      return Response.ok(stats).build();
     } catch (WebApplicationException ex) {
       throw ex;
     } catch (Exception ex) {
@@ -241,7 +300,7 @@ public class HelpService extends BaseService {
     }
   }
 
-  @GET
+    @GET
   @Path("/service-check-policy")
   public Response getServiceCheckList(){
     ServiceCheck serviceCheck = new ServiceCheck(context);
